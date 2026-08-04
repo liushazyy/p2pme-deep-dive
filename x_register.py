@@ -1,21 +1,21 @@
 #!/usr/bin/env python3
-"""X (Twitter) account registration automation — runs on GitHub Actions overseas runner.
+"""X (Twitter) account registration — phone-first flow (current X signup page).
 
-Flow:
-  1. Open x.com/signup
-  2. Fill name/email/DOB
-  3. Verify email (OTP via GitHub secret X_EMAIL_OTP if provided)
-  4. Enter phone for SMS verification -> pause, ask operator for code
-  5. Set password -> finish -> save cookies for later posting
+2026-08-04 实测: x.com/signup 首页 = "See what's happening / Select an option below:
+Continue with phone / Continue with Google / Continue with Apple / or: Email or username [Continue]"
+没有 name/email 表单，必须先从入口按钮进。
 
-State is saved to x_state.json so re-runs can resume (register -> email_otp -> sms_otp -> done).
+Flow (phone-first):
+  signup 页 -> 点 "Continue with phone" -> 选国家码 + 输手机号 -> Next
+  -> X 发 SMS OTP -> 用户提供 OTP -> 填 OTP -> Verify
+  -> 设置名字/用户名/密码 -> 完成 (存 cookies)
 """
-import json, os, sys, time, base64
+import json, os, sys, time
 
 EMAIL = os.environ.get("X_EMAIL", "")
 USERNAME = os.environ.get("X_USERNAME", "")
 PASSWORD = os.environ.get("X_PASSWORD", "")
-PHONE = os.environ.get("X_PHONE", "")
+PHONE = os.environ.get("X_PHONE", "")          # e.g. +8619137767895
 OTP = os.environ.get("X_OTP", "")
 RESUME = os.environ.get("RESUME", "false").lower() == "true"
 
@@ -32,192 +32,165 @@ def load_state():
 def save_state(s):
     with open(STATE_FILE, "w") as f:
         json.dump(s, f)
-    print(f"[state] step={s.get('step')} saved")
+    print(f"[state] step={s.get('step')} saved", flush=True)
+
+def click(page, selectors, timeout=8000):
+    for sel in selectors:
+        try:
+            loc = page.locator(sel)
+            if loc.count() and loc.first.is_visible():
+                loc.first.click(timeout=timeout)
+                return True
+        except Exception:
+            pass
+    return False
 
 from playwright.sync_api import sync_playwright
 
 def main():
     state = load_state()
-    if RESUME:
-        print(f"[resume] from step={state.get('step')}")
-    print(f"[cfg] email={EMAIL[:4]}*** user={USERNAME} phone={PHONE[-4:] if PHONE else '?'} otp_given={bool(OTP)}")
+    step = state.get("step", "start")
+    print(f"[cfg] phone={PHONE[-4:] if PHONE else '?'} user={USERNAME} otp_given={bool(OTP)} resume={RESUME} step={step}", flush=True)
 
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True, args=["--no-sandbox"])
         ctx = browser.new_context(
             viewport={"width": 1280, "height": 900},
             user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
+            locale="en-US",
         )
         page = ctx.new_page()
 
-        step = state.get("step", "start")
-
-        # ---- STEP 1: open signup ----
-        if step in ("start",):
-            print("[1] navigating to x.com/signup")
+        # ---- STEP 1: signup page -> Continue with phone ----
+        if step == "start":
+            print("[1] open x.com/signup", flush=True)
             page.goto("https://x.com/signup", timeout=60000, wait_until="domcontentloaded")
-            time.sleep(5)
-            # handle cookies dialog
-            for sel in ["text=Accept all cookies", "text=Refuse non-essential cookies"]:
-                try:
-                    if page.locator(sel).count():
-                        page.locator(sel).first.click(timeout=3000)
-                        time.sleep(2)
-                        break
-                except Exception:
-                    pass
-            # Screenshot for debugging
-            page.screenshot(path="x_step1_signup.png")
-            body = page.inner_text("body")[:800]
-            print(f"[1] page text: {body[:400]}")
-            # Fill the "Create your account" form
-            # name input
-            try:
-                page.fill('input[name="name"]', "Liu Daluo")
-                time.sleep(1)
-            except Exception as e:
-                print(f"[1] name fill fail: {e}")
-            try:
-                page.fill('input[name="email"]', EMAIL)
-                time.sleep(1)
-            except Exception as e:
-                print(f"[1] email fill fail: {e}")
-            # DOB selects
-            try:
-                page.select_option('select[name="month"]', "8")
-                page.select_option('select[name="day"]', "4")
-                page.select_option('select[name="year"]', "1990")
-                time.sleep(1)
-            except Exception as e:
-                print(f"[1] dob fill fail: {e}")
-            page.screenshot(path="x_step1_filled.png")
-            # click Next
-            for sel in ['[role="button"]:has-text("Next")', 'button:has-text("Next")']:
-                try:
-                    if page.locator(sel).count():
-                        page.locator(sel).first.click(timeout=5000)
-                        time.sleep(4)
-                        break
-                except Exception:
-                    pass
-            page.screenshot(path="x_step2_after_next.png")
-            body2 = page.inner_text("body")[:600]
-            print(f"[1] after next: {body2[:300]}")
-            save_state({"step": "signup_filled", "ts": time.time()})
+            time.sleep(6)
+            page.screenshot(path="x_s1_home.png")
+            body = page.inner_text("body")[:500]
+            print(f"[1] page: {body[:300]}", flush=True)
+            # click Continue with phone
+            ok = click(page, ['[role="button"]:has-text("Continue with phone")', 'button:has-text("Continue with phone")'])
+            print(f"[1] clicked phone entry: {ok}", flush=True)
+            time.sleep(4)
+            page.screenshot(path="x_s2_phone_entry.png")
+            save_state({"step": "phone_entry", "ts": time.time()})
 
-        # ---- STEP 2: email verification ----
-        if step in ("signup_filled", "email_otp"):
-            body = page.inner_text("body")
-            print(f"[2] page: {body[:300]}")
-            page.screenshot(path="x_step3_email_verify.png")
-            # If email OTP needed
-            if OTP:
-                try:
-                    otp_input = page.locator('input[inputmode="numeric"]').first
-                    otp_input.fill(OTP, timeout=5000)
+        # ---- STEP 2: phone number form ----
+        if step == "phone_entry":
+            body = page.inner_text("body")[:400]
+            print(f"[2] page: {body[:250]}", flush=True)
+            # country code dropdown: X uses a select with country codes
+            # phone input
+            filled = False
+            try:
+                # find visible text/tel input
+                inputs = page.locator('input:visible')
+                n = inputs.count()
+                print(f"[2] visible inputs: {n}", flush=True)
+                for i in range(n):
+                    ph = inputs.nth(i).get_attribute("placeholder") or ""
+                    inp_type = inputs.nth(i).get_attribute("inputmode") or inputs.nth(i).get_attribute("type") or ""
+                    print(f"  [{i}] type={inp_type} ph={ph}", flush=True)
+                # X phone input has name="phone_number" or inputmode=tel
+                ph_input = page.locator('input[inputmode="tel"], input[name="phone_number"]').first
+                if ph_input.count():
+                    digits = PHONE.replace("+", "").replace(" ", "")
+                    ph_input.fill(digits, timeout=8000)
                     time.sleep(1)
-                    for sel in ['[role="button"]:has-text("Verify")', 'button:has-text("Verify")']:
-                        try:
-                            if page.locator(sel).count():
-                                page.locator(sel).first.click(timeout=3000)
-                                time.sleep(4)
-                                break
-                        except Exception:
-                            pass
-                    save_state({"step": "email_verified", "ts": time.time()})
-                    print("[2] email OTP submitted")
-                except Exception as e:
-                    print(f"[2] otp fill fail: {e}")
-            else:
-                print("[2] waiting for email OTP - check if phone step offered instead")
-                # check for phone step
-                if "phone" in body.lower() or "enter your phone" in body.lower():
-                    save_state({"step": "phone_step", "ts": time.time()})
-
-        # ---- STEP 3: phone verification ----
-        if step in ("phone_step", "email_verified"):
-            body = page.inner_text("body")
-            print(f"[3] page: {body[:400]}")
-            page.screenshot(path="x_step4_phone.png")
-            if PHONE:
-                try:
-                    # phone input
-                    ph = page.locator('input[name="phone_number"], input[inputmode="tel"]').first
-                    ph.fill(PHONE, timeout=5000)
-                    time.sleep(1)
-                    for sel in ['[role="button"]:has-text("Next")', 'button:has-text("Next")']:
-                        try:
-                            if page.locator(sel).count():
-                                page.locator(sel).first.click(timeout=3000)
-                                time.sleep(4)
-                                break
-                        except Exception:
-                            pass
-                    page.screenshot(path="x_step5_sms_sent.png")
-                    save_state({"step": "sms_sent", "ts": time.time()})
-                    print("[3] phone submitted, SMS should be sent. Need OTP from operator.")
-                except Exception as e:
-                    print(f"[3] phone fill fail: {e}")
-                    page.screenshot(path="x_step4_phone_err.png")
-
-        # ---- STEP 4: SMS OTP ----
-        if step in ("sms_sent", "sms_otp"):
-            body = page.inner_text("body")
-            print(f"[4] page: {body[:300]}")
-            if OTP:
-                try:
-                    otp_input = page.locator('input[inputmode="numeric"]').first
-                    otp_input.fill(OTP, timeout=5000)
-                    time.sleep(1)
-                    for sel in ['[role="button"]:has-text("Verify")', 'button:has-text("Verify")']:
-                        try:
-                            if page.locator(sel).count():
-                                page.locator(sel).first.click(timeout=3000)
-                                time.sleep(4)
-                                break
-                        except Exception:
-                            pass
-                    page.screenshot(path="x_step6_sms_verified.png")
-                    save_state({"step": "sms_verified", "ts": time.time()})
-                    print("[4] SMS OTP submitted")
-                except Exception as e:
-                    print(f"[4] sms otp fill fail: {e}")
-            else:
-                print("[4] NEED X_OTP input to continue - rerun with otp=<code>")
-                # dump state to artifact
+                    filled = True
+            except Exception as e:
+                print(f"[2] phone fill: {e}", flush=True)
+            page.screenshot(path="x_s3_phone_filled.png")
+            if filled:
+                ok = click(page, ['[role="button"]:has-text("Next")', 'button:has-text("Next")'])
+                print(f"[2] clicked Next: {ok}", flush=True)
+                time.sleep(5)
+                page.screenshot(path="x_s4_after_next.png")
+                body2 = page.inner_text("body")[:400]
+                print(f"[2] after: {body2[:250]}", flush=True)
                 save_state({"step": "sms_sent", "ts": time.time()})
-                sys.exit(0)
+                print("[2] phone submitted — SMS sent. Rerun with otp=<code>", flush=True)
 
-        # ---- STEP 5: password + finish ----
-        if step in ("sms_verified", "finish"):
-            body = page.inner_text("body")
-            print(f"[5] page: {body[:300]}")
-            if PASSWORD:
+        # ---- STEP 3: SMS OTP ----
+        if step == "sms_sent":
+            body = page.inner_text("body")[:400]
+            print(f"[3] page: {body[:250]}", flush=True)
+            if OTP:
                 try:
-                    pw = page.locator('input[name="password"]').first
-                    pw.fill(PASSWORD, timeout=5000)
-                    time.sleep(1)
-                    for sel in ['[role="button"]:has-text("Sign up")', 'button:has-text("Sign up")', '[data-testid="signup"]']:
-                        try:
-                            if page.locator(sel).count():
-                                page.locator(sel).first.click(timeout=3000)
-                                time.sleep(6)
-                                break
-                        except Exception:
-                            pass
-                    page.screenshot(path="x_step7_done.png")
-                    # save cookies for later posting
-                    cookies = ctx.cookies()
-                    with open(COOKIE_FILE, "w") as f:
-                        json.dump(cookies, f)
-                    save_state({"step": "done", "ts": time.time()})
-                    print("[5] registration complete, cookies saved")
-                    body_final = page.inner_text("body")[:300]
-                    print(f"[5] final page: {body_final}")
+                    # numeric OTP input(s)
+                    otp_inputs = page.locator('input[inputmode="numeric"], input[autocomplete="one-time-code"]')
+                    n = otp_inputs.count()
+                    print(f"[3] otp inputs: {n}", flush=True)
+                    if n >= 1:
+                        # fill each char in sequence if multiple boxes
+                        if n > 1:
+                            for idx, ch in enumerate(OTP):
+                                if idx < n:
+                                    otp_inputs.nth(idx).fill(ch)
+                                    time.sleep(0.3)
+                        else:
+                            otp_inputs.first.fill(OTP)
+                        time.sleep(1)
+                        ok = click(page, ['[role="button"]:has-text("Verify")', 'button:has-text("Next")'])
+                        print(f"[3] clicked verify: {ok}", flush=True)
+                        time.sleep(6)
+                        page.screenshot(path="x_s5_otp_done.png")
+                        body3 = page.inner_text("body")[:400]
+                        print(f"[3] after otp: {body3[:250]}", flush=True)
+                        save_state({"step": "details", "ts": time.time()})
+                    else:
+                        print("[3] no OTP input found", flush=True)
                 except Exception as e:
-                    print(f"[5] password fill fail: {e}")
+                    print(f"[3] otp fill err: {e}", flush=True)
             else:
-                print("[5] no password set")
+                print("[3] NEED X_OTP — rerun with otp=<code>", flush=True)
+                page.screenshot(path="x_s5_wait_otp.png")
+
+        # ---- STEP 4: name/password/details ----
+        if step == "details":
+            body = page.inner_text("body")[:500]
+            print(f"[4] page: {body[:300]}", flush=True)
+            # fill name
+            try:
+                name_input = page.locator('input[name="name"], input[autocomplete="name"]').first
+                if name_input.count():
+                    name_input.fill("Liu Daluo", timeout=6000)
+                    time.sleep(0.5)
+            except Exception:
+                pass
+            # password
+            try:
+                pw = page.locator('input[type="password"], input[name="password"]').first
+                if pw.count():
+                    pw.fill(PASSWORD, timeout=6000)
+                    time.sleep(0.5)
+            except Exception:
+                pass
+            # username
+            try:
+                un = page.locator('input[name="username"], input[autocomplete="username"]').first
+                if un.count():
+                    un.fill(USERNAME, timeout=6000)
+                    time.sleep(0.5)
+            except Exception:
+                pass
+            page.screenshot(path="x_s6_details_filled.png")
+            ok = click(page, ['[role="button"]:has-text("Sign up")', 'button:has-text("Sign up")', '[data-testid="signup"]'])
+            print(f"[4] clicked signup: {ok}", flush=True)
+            time.sleep(8)
+            page.screenshot(path="x_s7_final.png")
+            body4 = page.inner_text("body")[:400]
+            print(f"[4] final: {body4[:250]}", flush=True)
+            # save cookies regardless
+            try:
+                cookies = ctx.cookies()
+                with open(COOKIE_FILE, "w") as f:
+                    json.dump(cookies, f)
+                save_state({"step": "done", "ts": time.time()})
+                print(f"[4] cookies saved ({len(cookies)})", flush=True)
+            except Exception as e:
+                print(f"[4] cookie save err: {e}", flush=True)
 
         browser.close()
 
