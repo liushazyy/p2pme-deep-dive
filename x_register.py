@@ -68,11 +68,60 @@ def main():
             time.sleep(6)
             print(f"[1] page: {page_body(page)[:250]}", flush=True)
             page.screenshot(path="x_s1_home.png")
-            ok = click(page, ['[role="button"]:has-text("Continue with phone")', 'button:has-text("Continue with phone")'])
-            print(f"[1] clicked phone entry: {ok}", flush=True)
+            # Use EMAIL path instead of phone (data-center IP phone signup is hard-blocked by X)
+            ok = click(page, ['[role="button"]:has-text("Email or username")', 'button:has-text("Email or username")'])
+            print(f"[1] clicked email entry: {ok}", flush=True)
             time.sleep(4)
-            step = "phone_entry"
+            # now a field appears: fill email then Continue
+            try:
+                email_input = page.locator('input[type="email"], input[name="email"], input[autocomplete="email"]').first
+                if email_input.count():
+                    email_input.fill(EMAIL, timeout=8000)
+                    time.sleep(1)
+                    print(f"[1] email filled: {EMAIL}", flush=True)
+            except Exception as e:
+                print(f"[1] email fill err: {e}", flush=True)
+            page.screenshot(path="x_s1b_email_filled.png")
+            ok2 = click(page, ['[role="button"]:has-text("Continue")', 'button:has-text("Continue")'])
+            print(f"[1] clicked Continue: {ok2}", flush=True)
+            time.sleep(6)
+            page.screenshot(path="x_s1c_after_email.png")
+            print(f"[1] after email: {page_body(page)[:300]}", flush=True)
+            step = "email_sent"
             save_state({"step": step, "ts": time.time()})
+
+        # ---- EMAIL OTP (or next step) ----
+        if step == "email_sent":
+            body = page_body(page)
+            print(f"[E] page: {body[:250]}", flush=True)
+            page.screenshot(path="x_se_email_wait.png")
+            if OTP:
+                try:
+                    otp_inputs = page.locator('input[inputmode="numeric"], input[autocomplete="one-time-code"]')
+                    n = otp_inputs.count()
+                    print(f"[E] otp inputs: {n}", flush=True)
+                    if n >= 1:
+                        if n > 1:
+                            for idx, ch in enumerate(OTP):
+                                if idx < n:
+                                    otp_inputs.nth(idx).fill(ch)
+                                    time.sleep(0.3)
+                        else:
+                            otp_inputs.first.fill(OTP)
+                        time.sleep(1)
+                        ok = click(page, ['[role="button"]:has-text("Verify")', 'button:has-text("Next")'])
+                        print(f"[E] clicked verify: {ok}", flush=True)
+                        time.sleep(6)
+                        page.screenshot(path="x_se_otp_done.png")
+                        print(f"[E] after otp: {page_body(page)[:250]}", flush=True)
+                        step = "details"
+                        save_state({"step": step, "ts": time.time()})
+                    else:
+                        print("[E] no OTP input visible", flush=True)
+                except Exception as e:
+                    print(f"[E] otp err: {e}", flush=True)
+            else:
+                print("[E] NEED EMAIL OTP — rerun with otp=<code>", flush=True)
 
         # ---- PHONE ENTRY: country code + phone ----
         if step == "phone_entry":
