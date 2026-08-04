@@ -3,12 +3,28 @@ name: x-account-register
 on:
   workflow_dispatch:
     inputs:
+      email:
+        description: 'X account email'
+        required: true
+        default: ''
+      username:
+        description: 'Desired X username'
+        required: true
+        default: ''
+      password:
+        description: 'X account password'
+        required: true
+        default: ''
+      phone:
+        description: 'Phone for SMS verification (E.164, e.g. +8619137767895)'
+        required: true
+        default: ''
       otp:
-        description: 'X SMS verification code from user phone'
+        description: 'SMS/email verification code (fill on 2nd run)'
         required: false
         default: ''
       resume:
-        description: 'resume from saved state (true if OTP step reached)'
+        description: 'resume from saved state'
         required: false
         default: 'false'
 
@@ -27,14 +43,14 @@ jobs:
           python -m playwright install chromium --with-deps
       - name: Run X registration
         env:
-          X_EMAIL: ${{ secrets.X_EMAIL }}
-          X_USERNAME: ${{ secrets.X_USERNAME }}
-          X_PASSWORD: ${{ secrets.X_PASSWORD }}
-          X_PHONE: ${{ secrets.X_PHONE }}
+          X_EMAIL: ${{ github.event.inputs.email }}
+          X_USERNAME: ${{ github.event.inputs.username }}
+          X_PASSWORD: ${{ github.event.inputs.password }}
+          X_PHONE: ${{ github.event.inputs.phone }}
           X_OTP: ${{ github.event.inputs.otp }}
           RESUME: ${{ github.event.inputs.resume }}
         run: |
-          python x_register.py
+          python x_register.py 2>&1 | tee x_register.log
       - name: Upload state
         uses: actions/upload-artifact@v4
         if: always()
@@ -43,4 +59,6 @@ jobs:
           path: |
             x_state.json
             x_cookies.json
+            x_*.png
+            x_register.log
           retention-days: 7
