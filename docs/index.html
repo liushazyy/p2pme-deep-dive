@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>P2P.me (P2Pdotme) — Deep Dive: The Decentralized On/Off-Ramp</title>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #0a0e17; color: #e6ebf2; margin: 0; padding: 0; line-height: 1.7; }
+  .wrap { max-width: 820px; margin: 0 auto; padding: 48px 24px 80px; }
+  .badge { display: inline-block; background: #10b98122; border: 1px solid #10b98155; color: #34d399; padding: 4px 14px; border-radius: 999px; font-size: 13px; letter-spacing: 0.5px; margin-bottom: 20px; }
+  h1 { font-size: 34px; line-height: 1.25; margin: 0 0 10px; letter-spacing: -0.5px; }
+  .sub { color: #8b94a7; font-size: 17px; margin-bottom: 32px; }
+  .meta { border-top: 1px solid #1e2735; border-bottom: 1px solid #1e2735; padding: 12px 0; margin-bottom: 28px; font-size: 14px; color: #8b94a7; display: flex; gap: 24px; flex-wrap: wrap; }
+  .meta b { color: #e6ebf2; }
+  h2 { font-size: 22px; margin: 36px 0 14px; color: #fff; }
+  p { margin: 0 0 16px; }
+  a { color: #60a5fa; text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  .card { background: #111827; border: 1px solid #1f2937; border-radius: 12px; padding: 18px 20px; margin: 16px 0; }
+  .card h3 { margin: 0 0 8px; font-size: 16px; color: #f59e0b; }
+  table { width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 14px; }
+  th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid #1f2937; vertical-align: top; }
+  th { color: #8b94a7; font-weight: 500; }
+  .tag { color: #34d399; }
+  .full { margin-top: 40px; padding: 24px; background: #0d1420; border: 1px solid #1f2937; border-radius: 12px; }
+  .full a { font-size: 15px; }
+  footer { margin-top: 48px; padding-top: 20px; border-top: 1px solid #1e2735; color: #5b6472; font-size: 13px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <span class="badge">SUPERTEAM EARN BOUNTY SUBMISSION</span>
+  <h1>P2P.me (P2Pdotme): The Decentralized On/Off-Ramp That Actually Owns the Rails</h1>
+  <div class="sub">A deep dive into how a non-custodial, zk-KYC, fully on-chain P2P protocol is rebuilding fiat ⇄ USDC swaps for Nigeria, India, Brazil, Indonesia, and beyond.</div>
+  <div class="meta">
+    <span>💰 <b>Bounty:</b> Deep dive on P2Pdotme</span>
+    <span>🌍 <b>Focus:</b> Nigeria + global emerging markets</span>
+    <span>📄 <b>Format:</b> Written deep dive</span>
+  </div>
+
+  <h2>The Problem: Fiat On/Off-Ramps Are the Weakest Link in Crypto</h2>
+  <p>For millions of users across emerging markets, the hardest part of crypto was never the blockchain — it's the <b>border between crypto and their bank account</b>. The typical journey: sign up on a centralized exchange, pass full KYC (ID photo, selfie), deposit fiat via a 1–3 day bank transfer, buy USDC at the exchange's spread — and then hope the payment partner doesn't freeze your account when you cash out.</p>
+  <p>This is not an edge case. In Nigeria, India, and Brazil, <b>bank account freezes on P2P and exchange withdrawals are a well-known, recurring pain</b>. Users don't need slightly faster settlement; they need a fundamentally different structure — one where no single party controls the money movement.</p>
+
+  <h2>What Is P2P.me?</h2>
+  <p><b>P2P.me</b> (p2p.lol) is a decentralized protocol for buying and selling USDC against local fiat currency. It's an <b>on/off-ramp without a central order book, without custodial balances, and without a platform that can freeze you</b>.</p>
+  <div class="card">
+    <h3>Backed by serious capital</h3>
+    <p style="margin:0">In April 2025, the project raised a <b>$2M seed round from Multicoin Capital and Coinbase Ventures</b> — a strong signal that the "decentralized fiat bridge" category is being taken seriously by the same funds that backed Solana's core infrastructure.</p>
+  </div>
+
+  <h2>How It Works: Fiat ⇄ USDC in Four Steps</h2>
+  <p>P2P.me connects users directly with <b>verified Liquidity Providers (LPs)</b> — real merchants who process swaps through their own bank accounts and earn <b>2% per completed order</b>.</p>
+  <ol>
+    <li><b>Request a swap</b> — "sell $500 USDC for Naira" or "buy USDC with Rupees" — through the app. No KYC required to start.</li>
+    <li><b>Matched with a verified LP</b> in your region (1000+ LPs globally), onboarded via ZK-Social verification and registered payment channels.</li>
+    <li><b>USDC moves on-chain</b> directly between your wallet and the LP's wallet, while the LP settles the fiat leg through their bank in minutes.</li>
+    <li><b>Settlement confirmed</b> — both sides recorded on-chain. No escrow, no custody, no platform wallet in the middle.</li>
+  </ol>
+  <p>Because there is no custody, <b>the protocol itself has nothing to freeze</b>. The worst-case failure mode of a CEX — "your funds are stuck on the platform" — structurally cannot happen here.</p>
+
+  <h2>The Three Pillars: Decentralization, Privacy, Fraud-Proofing</h2>
+  <div class="card"><h3>1. Decentralized by Construction</h3><p style="margin:0">An open protocol with no central authority that can censor transactions, freeze balances (there is no balance to freeze), or unilaterally change trade terms. Users retain <b>absolute ownership of their assets</b> at all times.</p></div>
+  <div class="card"><h3>2. zk-KYC: Privacy-First Verification</h3><p style="margin:0">Verify identity <b>without ever revealing the underlying data — not even to P2P.me itself</b>. No KYC to start; higher limits unlock via Zero-Knowledge verification. Combined with ZK-Social verification for LPs, the documented fraud rate is <b>less than 1 in 25,000 on/off-ramps</b> (~100x better than typical P2P services).</p></div>
+  <div class="card"><h3>3. Fraud Protection with Real Backing</h3><p style="margin:0">Verified LPs only — never trade with a random wallet. Plus a <b>100% refund + legal support policy</b> for bank freezes or liens (via unfreeze.pro). This turns "P2P fear" into "P2P confidence."</p></div>
+
+  <h2>Why Users Choose P2P.me</h2>
+  <table>
+    <tr><th>Pain point in legacy on/off-ramps</th><th>P2P.me's answer</th></tr>
+    <tr><td>Bank freezes on crypto-linked transfers</td><td>Non-custodial swaps; 100% refund + legal help</td></tr>
+    <tr><td>Full-KYC data exposure</td><td>zk-KYC — verify without revealing data</td></tr>
+    <tr><td>Slow settlement (1–3 days)</td><td>Near-instant swaps via global LP network</td></tr>
+    <tr><td>Platform custody risk</td><td>No escrow, no custody — you own your assets</td></tr>
+    <tr><td>Central control / censorship</td><td>Open protocol; no central authority</td></tr>
+    <tr><td>International transfers</td><td>Available in 9+ countries, local fiat rails</td></tr>
+  </table>
+
+  <h2>Cross-Border Payments: The Use Case That Matters</h2>
+  <p>Nigeria has one of the most active P2P crypto markets in the world — and some of the harshest freeze experiences. A protocol where the fiat leg is settled by a <b>verified LP rather than a centralized processor</b>, and where freezes carry a 100% refund policy, changes the risk equation completely. USDC becomes the settlement layer: cross-border value transfer with no SWIFT, no correspondent banking fees, no 3–5% FX haircut.</p>
+
+  <h2>Risk Notes (Intellectual Honesty)</h2>
+  <ul>
+    <li><b>Limits:</b> New users start at $100/order sell limit (10 orders/day); buy limits unlock after ZK verification.</li>
+    <li><b>LP concentration:</b> Depth varies by region — live in 9+ countries, but availability differs by market.</li>
+    <li><b>Tax compliance is on the user:</b> non-custodial protocol, full transaction history provided.</li>
+    <li><b>Regulatory evolution:</b> on/off-ramp category is young; compliance posture is reasonable but the space is not settled.</li>
+  </ul>
+
+  <h2>Why This Design Is the Right Answer</h2>
+  <p>For the person in Lagos, Jakarta, or São Paulo, the bottleneck was never the blockchain — it was <b>the exit ramp back to fiat</b>. P2P.me's answer — verified LPs, zk-KYC privacy, no custody, 100% freeze protection, on-chain settlement — attacks exactly that bottleneck. It's the rare on/off-ramp design where <b>the user's incentives and the protocol's incentives are aligned</b>.</p>
+
+  <div class="full">
+    <b>Full article with complete analysis:</b><br>
+    <a href="https://github.com/liushazyy/p2pme-deep-dive/blob/main/README.md">📄 Read the complete deep dive on GitHub →</a><br>
+    <span style="font-size:13px;color:#8b94a7">Sources: p2p.lol (official site, FAQs, whitepaper), CoinDesk coverage of the Multicoin/Coinbase Ventures seed round.</span>
+  </div>
+
+  <footer>Superteam Earn bounty submission — P2Pdotme deep dive · @p2pdotme · @coinsme_NG</footer>
+</div>
+</body>
+</html>
