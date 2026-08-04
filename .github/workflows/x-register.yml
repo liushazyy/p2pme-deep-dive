@@ -1,0 +1,46 @@
+name: x-account-register
+
+on:
+  workflow_dispatch:
+    inputs:
+      otp:
+        description: 'X SMS verification code from user phone'
+        required: false
+        default: ''
+      resume:
+        description: 'resume from saved state (true if OTP step reached)'
+        required: false
+        default: 'false'
+
+jobs:
+  register:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install deps
+        run: |
+          pip install playwright
+          python -m playwright install chromium --with-deps
+      - name: Run X registration
+        env:
+          X_EMAIL: ${{ secrets.X_EMAIL }}
+          X_USERNAME: ${{ secrets.X_USERNAME }}
+          X_PASSWORD: ${{ secrets.X_PASSWORD }}
+          X_PHONE: ${{ secrets.X_PHONE }}
+          X_OTP: ${{ github.event.inputs.otp }}
+          RESUME: ${{ github.event.inputs.resume }}
+        run: |
+          python x_register.py
+      - name: Upload state
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: x-register-state
+          path: |
+            x_state.json
+            x_cookies.json
+          retention-days: 7
