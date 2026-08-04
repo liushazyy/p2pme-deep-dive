@@ -1,0 +1,44 @@
+name: x-login-cookie
+
+on:
+  workflow_dispatch:
+    inputs:
+      otp:
+        description: 'SMS/email verification code if asked'
+        required: false
+        default: ''
+
+jobs:
+  login:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install playwright
+        run: |
+          pip install playwright -q
+          python -m playwright install chromium --with-deps -q
+      - name: Run login
+        env:
+          X_USER: ${{ vars.X_USER }}
+          X_PASS: ${{ secrets.X_PASS }}
+          OTP: ${{ github.event.inputs.otp }}
+        run: python x_login_cookie.py
+      - name: Upload cookies
+        uses: actions/upload-artifact@v4
+        with:
+          name: x-cookies
+          path: x_cookies.json
+          if-no-files-found: warn
+      - name: Commit cookies to repo
+        run: |
+          git config user.name "liushazyy"
+          git config user.email "liushazyy@users.noreply.github.com"
+          if [ -f x_cookies.json ]; then
+            git add x_cookies.json 2>/dev/null
+            git commit -m "update x cookies" 2>/dev/null || echo "no change"
+            git push 2>/dev/null || echo "push failed"
+          fi
