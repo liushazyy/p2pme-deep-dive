@@ -136,37 +136,78 @@ def main():
                 print(f"[2] phone fill: {e}", flush=True)
             page.screenshot(path="x_s3_phone_filled.png")
             if filled:
-                # X anti-automation: a <div data-testid="mask"> overlay intercepts pointer events.
-                # Remove all such masks before clicking, otherwise clicks get swallowed.
+                # X anti-automation: overlays inside #layers intercept pointer events
+                # (data-testid="mask", role="group" dialogs, etc). Nuke them all.
                 try:
                     removed = page.evaluate("""() => {
                       let n = 0;
-                      document.querySelectorAll('[data-testid="mask"], [data-testid="Mask"], [aria-hidden="true"] > div').forEach(el => {
-                        if (el && el.style) { el.style.display = 'none'; el.style.pointerEvents = 'none'; n++; }
-                      });
+                      const kill = (el) => {
+                        if (!el) return;
+                        el.style.setProperty('display', 'none', 'important');
+                        el.style.setProperty('pointer-events', 'none', 'important');
+                        el.style.setProperty('visibility', 'hidden', 'important');
+                        n++;
+                      };
+                      // deepest layers container
+                      const layers = document.querySelector('#layers');
+                      if (layers) {
+                        // remove everything in layers that has role/aria/data-testid and covers screen
+                        layers.querySelectorAll('[data-testid="mask"], [role="group"], [role="dialog"], [role="presentation"], [aria-modal="true"]').forEach(kill);
+                        // also kill any fixed full-screen div
+                        layers.querySelectorAll('div').forEach(el => {
+                          const r = el.getBoundingClientRect();
+                          if (r.width >= window.innerWidth - 20 && r.height >= window.innerHeight - 20 && r.top <= 0) kill(el);
+                        });
+                      }
                       return n;
                     }""")
-                    print(f"[2] removed {removed} mask overlays", flush=True)
-                    time.sleep(1)
+                    print(f"[2] removed {removed} layer overlays", flush=True)
+                    time.sleep(1.5)
                 except Exception as e:
-                    print(f"[2] mask removal err: {e}", flush=True)
-                # ensure button visible & enabled, then click
-                cont_ok = False
+                    print(f"[2] overlay removal err: {e}", flush=True)
+                # Primary submission: keyboard Enter on the phone input (bypasses pointer interception)
                 try:
-                    cont_btn = page.locator('[role="button"]:has-text("Continue")').first
-                    if cont_btn.count():
-                        cont_btn.scroll_into_view_if_needed(timeout=5000)
-                        time.sleep(1)
-                        disabled = cont_btn.get_attribute("aria-disabled") == "true" or cont_btn.evaluate("el => el.disabled === true || el.getAttribute('aria-disabled') === 'true'")
-                        print(f"[2] continue disabled: {disabled}", flush=True)
-                        if not disabled:
-                            cont_btn.click(timeout=8000)
-                            cont_ok = True
+                    ph_input = page.locator('input[inputmode="tel"], input[name="phone_number"], input[type="tel"]').first
+                    ph_input.press("Enter", timeout=5000)
+                    cont_ok = True
+                    print("[2] pressed Enter on phone input", flush=True)
                 except Exception as e:
-                    print(f"[2] continue click err: {e}", flush=True)
+                    print(f"[2] enter press err: {e}", flush=True)
+                    cont_ok = False
+                if not cont_ok:
+                    try:
+                        cont_btn = page.locator('[role="button"]:has-text("Continue")').first
+                        if cont_btn.count():
+                            cont_btn.scroll_into_view_if_needed(timeout=5000)
+                            time.sleep(1)
+                            disabled = cont_btn.get_attribute("aria-disabled") == "true" or cont_btn.evaluate("el => el.disabled === true || el.getAttribute('aria-disabled') === 'true'")
+                            print(f"[2] continue disabled: {disabled}", flush=True)
+                            if not disabled:
+                                cont_btn.click(timeout=8000)
+                                cont_ok = True
+                    except Exception as e:
+                        print(f"[2] continue click err: {e}", flush=True)
                 if not cont_ok:
                     ok = click(page, ['[role="button"]:has-text("Continue")', '[data-testid="phoneNumberContinue"]', 'button:has-text("Continue")'])
                     print(f"[2] clicked Continue (fallback): {ok}", flush=True)
+                if not cont_ok:
+                    # last resort: native JS click + bubbling mouse event (bypasses all interception)
+                    try:
+                        fired = page.evaluate("""() => {
+                          const btns = [...document.querySelectorAll('[role="button"]')];
+                          const b = btns.find(x => (x.textContent||'').trim() === 'Continue');
+                          if (!b) return 'NO_BUTTON';
+                          b.click();
+                          b.dispatchEvent(new MouseEvent('click', {bubbles: true, cancelable: true, view: window}));
+                          b.dispatchEvent(new MouseEvent('mousedown', {bubbles: true}));
+                          b.dispatchEvent(new MouseEvent('mouseup', {bubbles: true}));
+                          return 'JS_CLICKED';
+                        }""")
+                        print(f"[2] JS native click: {fired}", flush=True)
+                        time.sleep(5)
+                        cont_ok = True
+                    except Exception as e:
+                        print(f"[2] JS click err: {e}", flush=True)
                 time.sleep(7)
                 page.screenshot(path="x_s4_after_continue.png")
                 body2 = page_body(page)
