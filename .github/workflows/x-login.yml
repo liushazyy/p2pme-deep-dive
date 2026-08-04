@@ -20,7 +20,7 @@ jobs:
       - name: Install playwright
         run: |
           pip install playwright -q
-          python -m playwright install chromium --with-deps -q
+          python -m playwright install chromium --with-deps
       - name: Run login
         env:
           X_USER: ${{ vars.X_USER }}
