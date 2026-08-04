@@ -1,0 +1,11 @@
+[
+ "Prediction markets have a liquidity problem.\n\nOrder books die without market makers.\nAMMs make LPs bleed out.\nParimutuels punish early believers — late money dilutes their edge.\n\nThe Parimutuel Market Maker (PMM) fixes all three.\n\nLet's break down the paper 🧵",
+ "First, the problem most engines ignore:\n\nPrediction markets are NOT exchanges. Outcomes resolve, odds shift, and risk is binary — yet they're built on engines designed for spot trading.\n\nThe result: either nobody provides liquidity, or the people who do get eaten alive.",
+ "1/ Parimutuel: the pool prices itself\n\nEvery market is a parimutuel pool. Players back outcomes, and the POOL sets the odds and pays out.\n\nNo external market maker needed — liquid from the very first dollar.",
+ "2/ Dynamic curves: odds never go stale\n\nEach trade reprices the whole board.\n\nBuy \"Yes\" and every other outcome reprices instantly — the market always reflects what the crowd actually believes, in real time.",
+ "3/ The minimum-return floor: downside floored, upside uncapped\n\nYour minimum payout locks in when you enter — and it can ONLY climb.\n\nEarly money gets protected. Late money can't dilute what you already locked.",
+ "4/ Counterparty-liquidity rewards: your position pays you to hold\n\nEvery position doubles as a yield-bearing stake.\n\nHold longer → earn more rewards → bigger payout. Volatility literally pays you.\n\nThis is the piece that makes passive liquidity viable.",
+ "5/ Creator markets: a market for every niche\n\nAnyone can launch a market on anything and earn a cut of EVERY trade it generates — forever.\n\nMarket creation becomes recurring revenue, not a one-time event.",
+ "6/ DeFi liquidity: $100B+ finally gets in\n\nThere's $100B+ sitting in DeFi pools with no way into prediction markets.\n\nThe PMM is the first engine that lets that capital in — park capital, earn yield, back outcomes.",
+ "The bottom line:\n\n- Parimutuel base → self-pricing pools\n- Dynamic curves → never-stale odds\n- Min-return floor → protected early money\n- Hold-to-earn rewards → passive liquidity works\n- Creator markets → anyone can launch & earn\n\nOne engine. All of it.\n\nRead the full paper: pmm.melee.markets"
+]
