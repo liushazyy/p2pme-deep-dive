@@ -119,22 +119,45 @@ def main():
                 ph_input = page.locator('input[inputmode="tel"], input[name="phone_number"], input[type="tel"]').first
                 if ph_input.count():
                     digits = PHONE.replace("+", "").replace(" ", "")
-                    # if still +1 selected, digits need no country code; X wants local number
+                    # +86 selected -> strip country code prefix (86) so number is local
+                    if digits.startswith("86") and len(digits) > 11:
+                        digits = digits[2:]
                     ph_input.fill(digits, timeout=8000)
-                    time.sleep(1)
+                    time.sleep(1.5)
+                    # verify the Continue button is enabled (disabled means invalid number)
+                    cont_btn = page.locator('[role="button"]:has-text("Continue")').first
+                    if cont_btn.count():
+                        disabled = cont_btn.get_attribute("aria-disabled") == "true" or cont_btn.evaluate("el => el.disabled === true || el.getAttribute('aria-disabled') === 'true'")
+                        print(f"[2] phone filled: {digits} (continue_disabled={disabled})", flush=True)
+                    else:
+                        print(f"[2] phone filled: {digits}", flush=True)
                     filled = True
-                    print(f"[2] phone filled: {digits}", flush=True)
             except Exception as e:
                 print(f"[2] phone fill: {e}", flush=True)
             page.screenshot(path="x_s3_phone_filled.png")
             if filled:
-                ok = click(page, ['[role="button"]:has-text("Continue")', '[data-testid="phoneNumberContinue"]', 'button:has-text("Continue")'])
-                print(f"[2] clicked Continue: {ok}", flush=True)
-                time.sleep(6)
+                # ensure button visible & enabled, then click
+                cont_ok = False
+                try:
+                    cont_btn = page.locator('[role="button"]:has-text("Continue")').first
+                    if cont_btn.count():
+                        cont_btn.scroll_into_view_if_needed(timeout=5000)
+                        time.sleep(1)
+                        disabled = cont_btn.get_attribute("aria-disabled") == "true" or cont_btn.evaluate("el => el.disabled === true || el.getAttribute('aria-disabled') === 'true'")
+                        print(f"[2] continue disabled: {disabled}", flush=True)
+                        if not disabled:
+                            cont_btn.click(timeout=8000)
+                            cont_ok = True
+                except Exception as e:
+                    print(f"[2] continue click err: {e}", flush=True)
+                if not cont_ok:
+                    ok = click(page, ['[role="button"]:has-text("Continue")', '[data-testid="phoneNumberContinue"]', 'button:has-text("Continue")'])
+                    print(f"[2] clicked Continue (fallback): {ok}", flush=True)
+                time.sleep(7)
                 page.screenshot(path="x_s4_after_continue.png")
                 body2 = page_body(page)
                 print(f"[2] after continue: {body2[:250]}", flush=True)
-                if "verify" in body2.lower() or "code" in body2.lower() or "check your" in body2.lower():
+                if "verify" in body2.lower() or "code" in body2.lower() or "check your" in body2.lower() or "sent" in body2.lower():
                     step = "sms_sent"
                     save_state({"step": step, "ts": time.time()})
                     print("[2] SMS verification page reached", flush=True)
