@@ -79,35 +79,47 @@ def main():
             body = page_body(page)
             print(f"[2] page: {body[:250]}", flush=True)
             page.screenshot(path="x_s2_phone_entry.png")
-            # X phone form: country select + phone input
+            # X uses a custom country-code dropdown (button showing "+1" / flag).
+            # Click it, then search for China (+86) and click the option.
+            country_ok = False
+            try:
+                # the country selector: a button/div containing "+1" text near phone input
+                cc_sel = page.locator('button:has-text("+1"), div[role="button"]:has-text("+1"), [data-testid="phoneNumberCountryCode"]').first
+                if cc_sel.count() and cc_sel.is_visible():
+                    cc_sel.click(timeout=5000)
+                    time.sleep(2)
+                    page.screenshot(path="x_s2b_country_open.png")
+                    # now a dropdown with search appears; type "China" then click option
+                    search = page.locator('input[placeholder*="Search"], input[type="search"], input[placeholder*="search"]').first
+                    if search.count():
+                        search.fill("China", timeout=5000)
+                        time.sleep(1.5)
+                    opt = page.locator('[role="option"]:has-text("China"), [role="option"]:has-text("+86"), div[role="option"]:has-text("China")').first
+                    if opt.count():
+                        opt.click(timeout=5000)
+                        time.sleep(1.5)
+                        country_ok = True
+                        print("[2] country set to China +86", flush=True)
+                    else:
+                        # fallback: keyboard select via pressing Enter after search
+                        page.keyboard.press("Enter")
+                        time.sleep(1.5)
+                        country_ok = True
+                        print("[2] country selected via Enter", flush=True)
+                else:
+                    print("[2] country selector not found, assuming default", flush=True)
+                    country_ok = True
+            except Exception as e:
+                print(f"[2] country select err: {e}", flush=True)
+                country_ok = True
+            page.screenshot(path="x_s2c_country_done.png")
+            # phone number input
             filled = False
             try:
-                # country code: select element
-                for sel in ['select', 'select[name="phoneCountry"]']:
-                    try:
-                        sel_el = page.locator(sel).first
-                        if sel_el.count():
-                            opts = sel_el.locator("option")
-                            n = opts.count()
-                            # find option with value starting with +86 or text CN/China/+86
-                            target = None
-                            for i in range(n):
-                                v = opts.nth(i).get_attribute("value") or ""
-                                t = opts.nth(i).inner_text()
-                                if "86" in v or "China" in t or "CN" in v.upper():
-                                    target = i
-                                    break
-                            if target is not None:
-                                opts.nth(target).select_option(value=opts.nth(target).get_attribute("value"))
-                                print(f"[2] country selected idx={target}", flush=True)
-                                time.sleep(1)
-                            break
-                    except Exception:
-                        pass
-                # phone number input
                 ph_input = page.locator('input[inputmode="tel"], input[name="phone_number"], input[type="tel"]').first
                 if ph_input.count():
                     digits = PHONE.replace("+", "").replace(" ", "")
+                    # if still +1 selected, digits need no country code; X wants local number
                     ph_input.fill(digits, timeout=8000)
                     time.sleep(1)
                     filled = True
@@ -116,15 +128,19 @@ def main():
                 print(f"[2] phone fill: {e}", flush=True)
             page.screenshot(path="x_s3_phone_filled.png")
             if filled:
-                ok = click(page, ['[role="button"]:has-text("Next")', 'button:has-text("Next")'])
-                print(f"[2] clicked Next: {ok}", flush=True)
-                time.sleep(5)
-                page.screenshot(path="x_s4_after_next.png")
+                ok = click(page, ['[role="button"]:has-text("Continue")', '[data-testid="phoneNumberContinue"]', 'button:has-text("Continue")'])
+                print(f"[2] clicked Continue: {ok}", flush=True)
+                time.sleep(6)
+                page.screenshot(path="x_s4_after_continue.png")
                 body2 = page_body(page)
-                print(f"[2] after next: {body2[:250]}", flush=True)
-                step = "sms_sent"
-                save_state({"step": step, "ts": time.time()})
-                print("[2] phone submitted — SMS should be sent", flush=True)
+                print(f"[2] after continue: {body2[:250]}", flush=True)
+                if "verify" in body2.lower() or "code" in body2.lower() or "check your" in body2.lower():
+                    step = "sms_sent"
+                    save_state({"step": step, "ts": time.time()})
+                    print("[2] SMS verification page reached", flush=True)
+                else:
+                    # maybe error (invalid number) — retry once with plain digits
+                    print("[2] no verify page yet, may need retry", flush=True)
 
         # ---- SMS OTP ----
         if step == "sms_sent":
