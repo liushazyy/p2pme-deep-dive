@@ -1,0 +1,42 @@
+name: x-post-thread
+
+on:
+  workflow_dispatch:
+    inputs:
+      thread_file:
+        description: 'JSON/plain thread file path in repo (e.g. threads/pmm.json)'
+        required: true
+        default: 'threads/pmm.json'
+      tags:
+        description: 'Extra tags to append to first tweet'
+        required: false
+        default: ''
+
+jobs:
+  post:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install deps
+        run: |
+          pip install playwright
+          python -m playwright install chromium --with-deps
+      - name: Post thread
+        env:
+          X_TAGS: ${{ github.event.inputs.tags }}
+          X_POST_FILE: ${{ github.event.inputs.thread_file }}
+        run: |
+          python x_post_thread.py 2>&1 | tee x_post.log
+      - name: Upload state
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: x-post-result
+          path: |
+            x_post_*.png
+            x_post.log
+          retention-days: 7
