@@ -20,13 +20,13 @@ on:
         required: true
         default: ''
       otp:
-        description: 'SMS/email verification code (fill on 2nd run)'
+        description: 'SMS verification code (fill on 2nd run)'
         required: false
         default: ''
       resume:
         description: 'resume from saved state'
         required: false
-        default: 'false'
+        default: 'true'
 
 jobs:
   register:
@@ -34,6 +34,9 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          persist-credentials: true
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
@@ -48,9 +51,15 @@ jobs:
           X_PASSWORD: ${{ github.event.inputs.password }}
           X_PHONE: ${{ github.event.inputs.phone }}
           X_OTP: ${{ github.event.inputs.otp }}
-          RESUME: ${{ github.event.inputs.resume }}
         run: |
           python x_register.py 2>&1 | tee x_register.log
+      - name: Commit state back to repo
+        run: |
+          git config user.name "x-bot"
+          git config user.email "x-bot@users.noreply.github.com"
+          git add x_state.json x_cookies.json x_register.log 2>/dev/null || true
+          git commit -m "x-register state update [skip ci]" 2>/dev/null || echo "no changes"
+          git push origin main 2>&1 | tail -3 || echo "push failed (maybe no changes)"
       - name: Upload state
         uses: actions/upload-artifact@v4
         if: always()
