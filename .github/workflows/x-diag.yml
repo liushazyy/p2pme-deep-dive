@@ -1,0 +1,30 @@
+name: x-diag
+
+on:
+  workflow_dispatch:
+
+jobs:
+  diag:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install deps
+        run: |
+          pip install playwright
+          python -m playwright install chromium --with-deps
+      - name: Run diag
+        run: |
+          python x_diag.py 2>&1 | tee x_diag.log
+      - name: Upload diag
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: x-diag
+          path: |
+            x_diag.log
+            x_diag_home.png
+          retention-days: 7
